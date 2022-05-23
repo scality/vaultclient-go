@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	. "github.com/smartystreets/goconvey/convey"
@@ -45,15 +46,15 @@ func generateKeyErrorMaker(errs []request.ErrInvalidParam) error {
 }
 
 var generateKeyTests = []generateKeyTest{
-	generateKeyTest{description: "Should pass with valid accountName", accountName: &mockName, err: nil},
-	generateKeyTest{description: "Should pass with valid accountName, externalAccessKey and externalSecretKey", accountName: &mockName, externalAccessKey: &mockAccessKey, externalSecretKey: &mockSecretKey, err: nil},
+	{description: "Should pass with valid accountName", accountName: &mockName, err: nil},
+	{description: "Should pass with valid accountName, externalAccessKey and externalSecretKey", accountName: &mockName, externalAccessKey: &mockAccessKey, externalSecretKey: &mockSecretKey, err: nil},
 
-	generateKeyTest{description: "Should fail if accountName is empty", accountName: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("AccountName", 1)})},
-	generateKeyTest{description: "Should fail if accountName is not set", err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("AccountName")})},
+	{description: "Should fail if accountName is empty", accountName: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("AccountName", 1)})},
+	{description: "Should fail if accountName is not set", err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("AccountName")})},
 
-	generateKeyTest{description: "Should fail if externalAccessKey is empty", accountName: &mockName, externalAccessKey: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ExternalAccessKey", 1)})},
-	generateKeyTest{description: "Should fail if externalSecretKey is empty", accountName: &mockName, externalSecretKey: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ExternalSecretKey", 1)})},
-	generateKeyTest{description: "Should fail if both externalAccessKey and externalSecretKey are empty", accountName: &mockName, externalAccessKey: aws.String(""), externalSecretKey: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ExternalAccessKey", 1), request.NewErrParamMinLen("ExternalSecretKey", 1)})},
+	{description: "Should fail if externalAccessKey is empty", accountName: &mockName, externalAccessKey: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ExternalAccessKey", 1)})},
+	{description: "Should fail if externalSecretKey is empty", accountName: &mockName, externalSecretKey: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ExternalSecretKey", 1)})},
+	{description: "Should fail if both externalAccessKey and externalSecretKey are empty", accountName: &mockName, externalAccessKey: aws.String(""), externalSecretKey: aws.String(""), err: generateKeyErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ExternalAccessKey", 1), request.NewErrParamMinLen("ExternalSecretKey", 1)})},
 }
 
 func TestGenerateAccountAccessKey(t *testing.T) {
@@ -74,9 +75,10 @@ func TestGenerateAccountAccessKey(t *testing.T) {
 			Convey(description, func() {
 				ctx := context.Background()
 				sess := session.Must(session.NewSession(&aws.Config{
-					Endpoint:   aws.String(server.URL),
-					Region:     aws.String("us-east-1"),
-					HTTPClient: server.Client(),
+					Endpoint:    aws.String(server.URL),
+					Region:      aws.String("us-east-1"),
+					HTTPClient:  server.Client(),
+					Credentials: credentials.NewStaticCredentials("foo", "bar", "000"),
 				}))
 				svc := New(sess)
 				params := &GenerateAccountAccessKeyInput{}
@@ -93,6 +95,9 @@ func TestGenerateAccountAccessKey(t *testing.T) {
 				if tc.err != nil {
 					So(err.Error(), ShouldEqual, tc.err.Error())
 				} else {
+					So(err, ShouldBeNil)
+					So(res, ShouldNotBeNil)
+
 					So(*res.GeneratedKey.ID, ShouldEqual, mockAccessKey)
 					So(*res.GeneratedKey.Value, ShouldEqual, mockSecretKey)
 					So(*res.GeneratedKey.CreateDate, ShouldEqual, mockTime)

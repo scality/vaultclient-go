@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	. "github.com/smartystreets/goconvey/convey"
@@ -24,7 +25,7 @@ func mockListAccountsResponseBody(req *http.Request, t *testing.T) mockValue {
 		"isTruncated": mockIsTruncated,
 		"marker":      mockMarker,
 		"accounts": []mockValue{
-			mockValue{
+			{
 				"arn":          mockArn,
 				"id":           mockID,
 				"name":         mockName,
@@ -49,12 +50,12 @@ func listAccountsErrorMaker(errs []request.ErrInvalidParam) error {
 }
 
 var listListAccountsTests = []listAccountsTest{
-	listAccountsTest{description: "Should pass with no optional parameter", err: nil},
-	listAccountsTest{description: "Should pass with valid maxItems", maxItems: mockMaxItems, err: nil},
-	listAccountsTest{description: "Should pass with valid marker", marker: &mockMarker, err: nil},
+	{description: "Should pass with no optional parameter", err: nil},
+	{description: "Should pass with valid maxItems", maxItems: mockMaxItems, err: nil},
+	{description: "Should pass with valid marker", marker: &mockMarker, err: nil},
 
-	listAccountsTest{description: "Should fail with invalid maxItems", maxItems: aws.Int64(0), err: listAccountsErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinValue("MaxItems", 1)})},
-	listAccountsTest{description: "Should fail with invalid marker", marker: aws.String(""), err: listAccountsErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Marker", 1)})},
+	{description: "Should fail with invalid maxItems", maxItems: aws.Int64(0), err: listAccountsErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinValue("MaxItems", 1)})},
+	{description: "Should fail with invalid marker", marker: aws.String(""), err: listAccountsErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Marker", 1)})},
 }
 
 func TestListAccounts(t *testing.T) {
@@ -75,9 +76,10 @@ func TestListAccounts(t *testing.T) {
 			Convey(description, func() {
 				ctx := context.Background()
 				sess := session.Must(session.NewSession(&aws.Config{
-					Endpoint:   aws.String(server.URL),
-					Region:     aws.String("us-east-1"),
-					HTTPClient: server.Client(),
+					Endpoint:    aws.String(server.URL),
+					Region:      aws.String("us-east-1"),
+					HTTPClient:  server.Client(),
+					Credentials: credentials.NewStaticCredentials("foo", "bar", "000"),
 				}))
 				svc := New(sess)
 				params := &ListAccountsInput{}
@@ -91,6 +93,9 @@ func TestListAccounts(t *testing.T) {
 				if tc.err != nil {
 					So(err.Error(), ShouldEqual, tc.err.Error())
 				} else {
+					So(err, ShouldBeNil)
+					So(res, ShouldNotBeNil)
+
 					So(*res.IsTruncated, ShouldEqual, mockIsTruncated)
 					So(*res.Marker, ShouldEqual, mockMarker)
 					So(len(res.Accounts), ShouldEqual, 1)
