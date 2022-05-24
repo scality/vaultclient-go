@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	. "github.com/smartystreets/goconvey/convey"
@@ -28,10 +29,10 @@ func deleteAccountErrorMaker(errs []request.ErrInvalidParam) error {
 }
 
 var listDeleteAccountTests = []deleteAccountTest{
-	deleteAccountTest{description: "Should pass with valid accountName ", accountName: &mockName, err: nil},
+	{description: "Should pass with valid accountName ", accountName: &mockName, err: nil},
 
-	deleteAccountTest{description: "Should fail if accountName is empty", accountName: aws.String(""), err: deleteAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("AccountName", 1)})},
-	deleteAccountTest{description: "Should fail if accountName is not set", err: deleteAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("AccountName")})},
+	{description: "Should fail if accountName is empty", accountName: aws.String(""), err: deleteAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("AccountName", 1)})},
+	{description: "Should fail if accountName is not set", err: deleteAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("AccountName")})},
 }
 
 func TestDeleteAccount(t *testing.T) {
@@ -42,7 +43,11 @@ func TestDeleteAccount(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		res.Write(rjson)
+
+		_, err = res.Write(rjson)
+		if err != nil {
+			t.Error(err)
+		}
 	}))
 	defer server.Close()
 
@@ -52,9 +57,10 @@ func TestDeleteAccount(t *testing.T) {
 			Convey(description, func() {
 				ctx := context.Background()
 				sess := session.Must(session.NewSession(&aws.Config{
-					Endpoint:   aws.String(server.URL),
-					Region:     aws.String("us-east-1"),
-					HTTPClient: server.Client(),
+					Endpoint:    aws.String(server.URL),
+					Region:      aws.String("us-east-1"),
+					HTTPClient:  server.Client(),
+					Credentials: credentials.NewStaticCredentials("foo", "bar", "000"),
 				}))
 				svc := New(sess)
 				params := &DeleteAccountInput{}
