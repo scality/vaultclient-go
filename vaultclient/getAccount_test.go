@@ -50,8 +50,12 @@ var listGetAccountTests = []GetAccountTest{
 
 func mockGetAccountResponseBody(req *http.Request, t *testing.T) mockValue {
 	buf := new(bytes.Buffer)
-	buf.ReadFrom(req.Body)
-	v, err := url.ParseQuery(string(buf.Bytes()))
+	_, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		t.Error(err)
+	}
+
+	v, err := url.ParseQuery(buf.String())
 	if err != nil {
 		t.Error(err)
 	}
@@ -92,7 +96,10 @@ func TestGetAccount(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		res.Write(rjson)
+		_, err = res.Write(rjson)
+		if err != nil {
+			t.Error(err)
+		}
 	}))
 	defer server.Close()
 

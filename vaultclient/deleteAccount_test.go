@@ -43,7 +43,11 @@ func TestDeleteAccount(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		res.Write(rjson)
+
+		_, err = res.Write(rjson)
+		if err != nil {
+			t.Error(err)
+		}
 	}))
 	defer server.Close()
 
