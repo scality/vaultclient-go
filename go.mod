@@ -1,8 +1,8 @@
 module github.com/scality/vaultclient-go
 
-go 1.13
+go 1.18
 
 require (
-	github.com/aws/aws-sdk-go v1.30.10
-	github.com/smartystreets/goconvey v1.6.4
+	github.com/aws/aws-sdk-go v1.44.20
+	github.com/smartystreets/goconvey v1.7.2
 )
