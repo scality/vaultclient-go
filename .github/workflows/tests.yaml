@@ -9,6 +9,7 @@ on:
 
 env:
   GOFLAGS: -mod=vendor
+  GO_VERSION: 1.24.4
 
 jobs:
   build:
@@ -20,7 +21,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.18
+        go-version: ${{ env.GO_VERSION }}
 
     - name: Build
       run: go build -v ./...
@@ -37,7 +38,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.18
+        go-version: ${{ env.GO_VERSION }}
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v6
