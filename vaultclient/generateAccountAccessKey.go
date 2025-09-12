@@ -1,11 +1,12 @@
 package vaultclient
 
 import (
+	"context"
+	"fmt"
+	"net/url"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awsutil"
-	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/smithy-go"
 )
 
 const opGenerateAccountAccessKey = "GenerateAccountAccessKey"
@@ -18,26 +19,26 @@ type GenerateAccountAccessKeyInput struct {
 
 // String returns the string representation
 func (s GenerateAccountAccessKeyInput) String() string {
-	return awsutil.Prettify(s)
+	return fmt.Sprintf("GenerateAccountAccessKeyInput{AccountName: %v, ExternalAccessKey: %v, ExternalSecretKey: %v}",
+		s.AccountName, s.ExternalAccessKey, s.ExternalSecretKey)
 }
 
 // Validate inspects the fields of the type to determine if they are valid.
 func (s *GenerateAccountAccessKeyInput) Validate() error {
-	invalidParams := request.ErrInvalidParams{Context: "GenerateAccountAccessKeyInput"}
+	invalidParams := &smithy.InvalidParamsError{Context: "GenerateAccountAccessKeyInput"}
 
 	if s.AccountName == nil {
-		invalidParams.Add(request.NewErrParamRequired("AccountName"))
-	}
-	if s.AccountName != nil && len(*s.AccountName) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("AccountName", 1))
+		invalidParams.Add(smithy.NewErrParamRequired("AccountName"))
+	} else if len(*s.AccountName) < 1 {
+		invalidParams.Add(NewErrParamMinLen("AccountName", 1))
 	}
 
 	if s.ExternalAccessKey != nil && len(*s.ExternalAccessKey) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("ExternalAccessKey", 1))
+		invalidParams.Add(NewErrParamMinLen("ExternalAccessKey", 1))
 	}
 
 	if s.ExternalSecretKey != nil && len(*s.ExternalSecretKey) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("ExternalSecretKey", 1))
+		invalidParams.Add(NewErrParamMinLen("ExternalSecretKey", 1))
 	}
 
 	if invalidParams.Len() > 0 {
@@ -64,6 +65,18 @@ func (s *GenerateAccountAccessKeyInput) SetExternalSecretKey(v string) *Generate
 	return s
 }
 
+func (s *GenerateAccountAccessKeyInput) getUrlValues() url.Values {
+	formData := url.Values{}
+	formData.Set("AccountName", *s.AccountName)
+	if s.ExternalAccessKey != nil {
+		formData.Set("externalAccessKey", *s.ExternalAccessKey)
+	}
+	if s.ExternalSecretKey != nil {
+		formData.Set("externalSecretKey", *s.ExternalSecretKey)
+	}
+	return formData
+}
+
 // GenerateAccountAccessKey API operation generates a new access key for the account
 // and adds the ability to pass a context and additional request options.
 //
@@ -71,51 +84,39 @@ func (s *GenerateAccountAccessKeyInput) SetExternalSecretKey(v string) *Generate
 // the context is nil a panic will occur. In the future the SDK may create
 // sub-contexts for http.Requests. See https://golang.org/pkg/context/
 // for more information on using Contexts.
-func (c *Vault) GenerateAccountAccessKey(ctx aws.Context, input *GenerateAccountAccessKeyInput, opts ...request.Option) (*GenerateAccountAccessKeyOutput, error) {
-	req, out := c.GenerateAccountAccessKeyRequest(input)
-	req.SetContext(ctx)
-	req.ApplyOptions(opts...)
-	return out, req.Send()
-}
-
-// GenerateAccountAccessKeyRequest generates a "aws/request.Request" representing the
-// client's request for the GenerateAccountAccessKey operation. The "output" return
-// value will be populated with the request's response once the request completes
-// successfully.
-//
-// Use "Send" method on the returned Request to send the API call to the service.
-// the "output" return value is not valid until after Send returns without error.
-func (c *Vault) GenerateAccountAccessKeyRequest(input *GenerateAccountAccessKeyInput) (req *request.Request, output *GenerateAccountAccessKeyOutput) {
-	op := &request.Operation{
-		Name:       opGenerateAccountAccessKey,
-		HTTPMethod: "POST",
-		HTTPPath:   "/",
+func (c *Vault) GenerateAccountAccessKey(ctx context.Context, input *GenerateAccountAccessKeyInput) (*GenerateAccountAccessKeyOutput, error) {
+	if err := input.Validate(); err != nil {
+		return nil, err
 	}
 
-	if input == nil {
-		input = &GenerateAccountAccessKeyInput{}
+	resp, err := c.makeAWSRequest(ctx, opGenerateAccountAccessKey, input.getUrlValues())
+	if err != nil {
+		return nil, err
 	}
 
-	output = &GenerateAccountAccessKeyOutput{}
-	req = c.newRequest(op, input, output)
-	return
+	var output GenerateAccountAccessKeyOutput
+	if err := c.handleAWSResponse(resp, &output); err != nil {
+		return nil, err
+	}
+
+	return &output, nil
 }
 
 type GeneratedKey struct {
-	ID           *string    `locationName:"id"`
-	Value        *string    `locationName:"value"`
-	CreateDate   *time.Time `locationName:"createDate"`
-	LastUsedDate *time.Time `locationName:"lastUsedDate"`
-	Status       *string    `locationName:"status"`
-	UserID       *string    `locationName:"userId"`
+	ID           *string    `locationName:"id" json:"id"`
+	Value        *string    `locationName:"value" json:"value"`
+	CreateDate   *time.Time `locationName:"createDate" json:"createDate"`
+	LastUsedDate *time.Time `locationName:"lastUsedDate" json:"lastUsedDate"`
+	Status       *string    `locationName:"status" json:"status"`
+	UserID       *string    `locationName:"userId" json:"userId"`
 }
 
 // GenerateAccountAccessKeyOutput contains the response to a successful GenerateAccountAccessKey request.
 type GenerateAccountAccessKeyOutput struct {
-	GeneratedKey *GeneratedKey `type:"structure" locationName:"data"`
+	GeneratedKey *GeneratedKey `type:"structure" locationName:"data" json:"data"`
 }
 
 // String returns the string representation
 func (s GenerateAccountAccessKeyOutput) String() string {
-	return awsutil.Prettify(s)
+	return fmt.Sprintf("GenerateAccountAccessKeyOutput{GeneratedKey: %v}", s.GeneratedKey)
 }
