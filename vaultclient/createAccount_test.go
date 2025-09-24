@@ -1,7 +1,6 @@
 package vaultclient
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -11,10 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/smithy-go"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -31,20 +28,10 @@ var (
 	mockTime, _     = time.Parse(time.RFC3339, mockCreateDate)
 )
 
-func mockResponseBody(req *http.Request, t *testing.T) mockValue {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(req.Body)
-	if err != nil {
-		t.Error(err)
-	}
-
-	v, err := url.ParseQuery(buf.String())
-	if err != nil {
-		t.Error(err)
-	}
-
+func mockResponseBody(v url.Values, t *testing.T) mockValue {
 	var quotaMax int64
 	if v.Get("quotaMax") != "" {
+		var err error
 		quotaMax, err = strconv.ParseInt(v.Get("quotaMax"), 10, 64)
 		if err != nil {
 			t.Error(err)
@@ -74,16 +61,12 @@ type createAccountTest struct {
 	description       string
 }
 
-func invalidParamsErrorMaker(errs []request.ErrInvalidParam, context string) error {
-	invalidInputParams := request.ErrInvalidParams{Context: context}
-	for _, e := range errs {
-		invalidInputParams.Add(e)
+func createAccountErrorMaker(errs []smithy.InvalidParamError) error {
+	invalidParams := &smithy.InvalidParamsError{Context: "CreateAccountInput"}
+	for _, err := range errs {
+		invalidParams.Add(err)
 	}
-	return invalidInputParams
-}
-
-func createAccountErrorMaker(errs []request.ErrInvalidParam) error {
-	return invalidParamsErrorMaker(errs, "CreateAccountInput")
+	return invalidParams
 }
 
 var listCreateAccountTests = []createAccountTest{
@@ -91,19 +74,29 @@ var listCreateAccountTests = []createAccountTest{
 	{description: "Should pass with valid quotaMax", name: &mockName, email: &mockEmail, quotaMax: &mockQuotaMax, err: nil},
 	{description: "Should pass with valid externalAccountID", name: &mockName, email: &mockEmail, externalAccountID: &mockID, err: nil},
 
-	{description: "Should fail if name is empty", name: aws.String(""), email: &mockEmail, quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Name", 1)})},
-	{description: "Should fail if name is not set", email: &mockEmail, quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("Name")})},
-	{description: "Should fail if email is empty", name: &mockName, email: aws.String(""), quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Email", 1)})},
-	{description: "Should fail if email is not set", name: &mockName, quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("Email")})},
-	{description: "Should fail if quotaMax is set to 0", name: &mockName, email: &mockEmail, quotaMax: aws.Int64(0), err: createAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinValue("QuotaMax", 1)})},
-	{description: "Should fail if name and email are not set", err: createAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("Name"), request.NewErrParamRequired("Email")})},
-	{description: "Should fail if externalAccountID is empty", name: &mockName, email: &mockEmail, externalAccountID: aws.String(""), err: createAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ExternalAccountID", 1)})},
+	{description: "Should fail if name is empty", name: aws.String(""), email: &mockEmail, quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("Name", 1)})},
+	{description: "Should fail if name is not set", email: &mockEmail, quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]smithy.InvalidParamError{smithy.NewErrParamRequired("Name")})},
+	{description: "Should fail if email is empty", name: &mockName, email: aws.String(""), quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("Email", 1)})},
+	{description: "Should fail if email is not set", name: &mockName, quotaMax: &mockQuotaMax, err: createAccountErrorMaker([]smithy.InvalidParamError{smithy.NewErrParamRequired("Email")})},
+	{description: "Should fail if quotaMax is set to 0", name: &mockName, email: &mockEmail, quotaMax: aws.Int64(0), err: createAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinValue("QuotaMax", 1)})},
+	{description: "Should fail if name and email are not set", err: createAccountErrorMaker([]smithy.InvalidParamError{smithy.NewErrParamRequired("Name"), smithy.NewErrParamRequired("Email")})},
+	{description: "Should fail if externalAccountID is empty", name: &mockName, email: &mockEmail, externalAccountID: aws.String(""), err: createAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("ExternalAccountID", 1)})},
 }
 
 func TestCreateAccount(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		err := req.ParseForm()
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if req.Form.Get("Action") != opCreateAccount {
+			t.Errorf("Expected Action=CreateAccount, got %s", req.Form.Get("Action"))
+		}
+
 		// Send response to be tested
-		resBody := mockResponseBody(req, t)
+		resBody := mockResponseBody(req.Form, t)
 		rjson, err := json.Marshal(resBody)
 		if err != nil {
 			t.Error(err)
@@ -121,13 +114,7 @@ func TestCreateAccount(t *testing.T) {
 			description := tc.description
 			Convey(description, func() {
 				ctx := context.Background()
-				sess := session.Must(session.NewSession(&aws.Config{
-					Endpoint:    aws.String(server.URL),
-					Region:      aws.String("us-east-1"),
-					HTTPClient:  server.Client(),
-					Credentials: credentials.NewStaticCredentials("foo", "bar", "000"),
-				}))
-				svc := New(sess)
+				svc := New("foo", "bar", "", server.URL, "us-east-1")
 				params := &CreateAccountInput{}
 				if tc.name != nil {
 					params.SetName(*tc.name)

@@ -1,16 +1,18 @@
 package vaultclient
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awsutil"
-	"github.com/aws/aws-sdk-go/aws/request"
+	"context"
+	"fmt"
+	"net/url"
+
+	"github.com/aws/smithy-go"
 )
 
 const opGetAccount = "GetAccount"
 
 type GetAccountInput struct {
 	Arn         *string `locationName:"accountArn"`
-	CanonicalId *string `locationName:"canonicalId"`
+	CanonicalID *string `locationName:"canonicalId"`
 	Email       *string `locationName:"emailAddress"`
 	ID          *string `locationName:"accountId"`
 	Name        *string `locationName:"accountName"`
@@ -18,35 +20,36 @@ type GetAccountInput struct {
 
 // String returns the string representation
 func (s GetAccountInput) String() string {
-	return awsutil.Prettify(s)
+	return fmt.Sprintf("GetAccountInput{Arn: %v, CanonicalID: %v, Email: %v, ID: %v, Name: %v}",
+		s.Arn, s.CanonicalID, s.Email, s.ID, s.Name)
 }
 
 // Validate inspects the fields of the type to determine if they are valid.
 func (s *GetAccountInput) Validate() error {
-	invalidParams := request.ErrInvalidParams{Context: "GetAccountInput"}
+	invalidParams := &smithy.InvalidParamsError{Context: "GetAccountInput"}
 
-	if s.Arn != nil && len(*s.Arn) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("Arn", 1))
+	if s.Arn == nil && s.ID == nil && s.Name == nil && s.Email == nil && s.CanonicalID == nil {
+		invalidParams.Add(smithy.NewErrParamRequired("Arn, ID, Name, Email or CanonicalId"))
 	}
 
-	if s.CanonicalId != nil && len(*s.CanonicalId) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("CanonicalId", 1))
+	if s.Arn != nil && len(*s.Arn) < 1 {
+		invalidParams.Add(NewErrParamMinLen("Arn", 1))
+	}
+
+	if s.CanonicalID != nil && len(*s.CanonicalID) < 1 {
+		invalidParams.Add(NewErrParamMinLen("CanonicalId", 1))
 	}
 
 	if s.Email != nil && len(*s.Email) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("Email", 1))
+		invalidParams.Add(NewErrParamMinLen("Email", 1))
 	}
 
 	if s.ID != nil && len(*s.ID) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("ID", 1))
+		invalidParams.Add(NewErrParamMinLen("ID", 1))
 	}
 
 	if s.Name != nil && len(*s.Name) < 1 {
-		invalidParams.Add(request.NewErrParamMinLen("Name", 1))
-	}
-
-	if s.Arn == nil && s.ID == nil && s.Name == nil && s.Email == nil && s.CanonicalId == nil {
-		invalidParams.Add(request.NewErrParamRequired("Arn, ID, Name, Email or CanonicalId"))
+		invalidParams.Add(NewErrParamMinLen("Name", 1))
 	}
 
 	if invalidParams.Len() > 0 {
@@ -63,7 +66,7 @@ func (s *GetAccountInput) SetArn(v string) *GetAccountInput {
 
 // SetCanonicalId sets the CanonicalId field's value.
 func (s *GetAccountInput) SetCanonicalId(v string) *GetAccountInput {
-	s.CanonicalId = &v
+	s.CanonicalID = &v
 	return s
 }
 
@@ -85,6 +88,26 @@ func (s *GetAccountInput) SetName(v string) *GetAccountInput {
 	return s
 }
 
+func (s *GetAccountInput) getUrlValues() url.Values {
+	formData := url.Values{}
+	if s.Arn != nil {
+		formData.Set("accountArn", *s.Arn)
+	}
+	if s.CanonicalID != nil {
+		formData.Set("canonicalId", *s.CanonicalID)
+	}
+	if s.Email != nil {
+		formData.Set("emailAddress", *s.Email)
+	}
+	if s.ID != nil {
+		formData.Set("accountId", *s.ID)
+	}
+	if s.Name != nil {
+		formData.Set("accountName", *s.Name)
+	}
+	return formData
+}
+
 // GetAccount API operation gets details about a Vault account
 // and adds the ability to pass a context and additional request options.
 //
@@ -92,34 +115,22 @@ func (s *GetAccountInput) SetName(v string) *GetAccountInput {
 // the context is nil a panic will occur. In the future the SDK may create
 // sub-contexts for http.Requests. See https://golang.org/pkg/context/
 // for more information on using Contexts.
-func (c *Vault) GetAccount(ctx aws.Context, input *GetAccountInput, opts ...request.Option) (*GetAccountOutput, error) {
-	req, out := c.GetAccountRequest(input)
-	req.SetContext(ctx)
-	req.ApplyOptions(opts...)
-	return out, req.Send()
-}
-
-// GetAccountRequest generates a "aws/request.Request" representing the
-// client's request for the GetAccount operation. The "output" return
-// value will be populated with the request's response once the request completes
-// successfully.
-//
-// Use "Send" method on the returned Request to send the API call to the service.
-// the "output" return value is not valid until after Send returns without error.
-func (c *Vault) GetAccountRequest(input *GetAccountInput) (req *request.Request, output *GetAccountOutput) {
-	op := &request.Operation{
-		Name:       opGetAccount,
-		HTTPMethod: "POST",
-		HTTPPath:   "/",
+func (c *Vault) GetAccount(ctx context.Context, input *GetAccountInput) (*GetAccountOutput, error) {
+	if err := input.Validate(); err != nil {
+		return nil, err
 	}
 
-	if input == nil {
-		input = &GetAccountInput{}
+	resp, err := c.makeAWSRequest(ctx, opGetAccount, input.getUrlValues())
+	if err != nil {
+		return nil, err
 	}
 
-	output = &GetAccountOutput{}
-	req = c.newRequest(op, input, output)
-	return
+	var output GetAccountOutput
+	if err := c.handleAWSResponse(resp, &output); err != nil {
+		return nil, err
+	}
+
+	return &output, nil
 }
 
 // GetAccountOutput contains the response to a successful GetAccount request.
@@ -127,5 +138,5 @@ type GetAccountOutput = AccountData
 
 // String returns the string representation
 func (s GetAccountOutput) String() string {
-	return awsutil.Prettify(s)
+	return fmt.Sprintf("GetAccountOutput{Arn:%v, Name:%v, ID:%v}", s.Arn, s.Name, s.ID)
 }

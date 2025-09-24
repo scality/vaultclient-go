@@ -7,10 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/smithy-go"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -45,8 +43,12 @@ type listAccountsTest struct {
 	description string
 }
 
-func listAccountsErrorMaker(errs []request.ErrInvalidParam) error {
-	return invalidParamsErrorMaker(errs, "ListAccountsInput")
+func listAccountsErrorMaker(errs []smithy.InvalidParamError) error {
+	invalidParams := &smithy.InvalidParamsError{Context: "ListAccountsInput"}
+	for _, err := range errs {
+		invalidParams.Add(err)
+	}
+	return invalidParams
 }
 
 var listListAccountsTests = []listAccountsTest{
@@ -54,12 +56,21 @@ var listListAccountsTests = []listAccountsTest{
 	{description: "Should pass with valid maxItems", maxItems: mockMaxItems, err: nil},
 	{description: "Should pass with valid marker", marker: &mockMarker, err: nil},
 
-	{description: "Should fail with invalid maxItems", maxItems: aws.Int64(0), err: listAccountsErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinValue("MaxItems", 1)})},
-	{description: "Should fail with invalid marker", marker: aws.String(""), err: listAccountsErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Marker", 1)})},
+	{description: "Should fail with invalid maxItems", maxItems: aws.Int64(0), err: listAccountsErrorMaker([]smithy.InvalidParamError{NewErrParamMinValue("MaxItems", 1)})},
+	{description: "Should fail with invalid marker", marker: aws.String(""), err: listAccountsErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("Marker", 1)})},
 }
 
 func TestListAccounts(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		err := req.ParseForm()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if action := req.Form.Get("Action"); action != opListAccounts {
+			t.Errorf("Expected Action=ListAccounts, got Action=%s", action)
+		}
+
 		// Send response to be tested
 		resBody := mockListAccountsResponseBody(req, t)
 		rjson, err := json.Marshal(resBody)
@@ -79,13 +90,7 @@ func TestListAccounts(t *testing.T) {
 			description := tc.description
 			Convey(description, func() {
 				ctx := context.Background()
-				sess := session.Must(session.NewSession(&aws.Config{
-					Endpoint:    aws.String(server.URL),
-					Region:      aws.String("us-east-1"),
-					HTTPClient:  server.Client(),
-					Credentials: credentials.NewStaticCredentials("foo", "bar", "000"),
-				}))
-				svc := New(sess)
+				svc := New("foo", "bar", "", server.URL, "us-east-1")
 				params := &ListAccountsInput{}
 				if tc.marker != nil {
 					params.SetMarker(*tc.marker)

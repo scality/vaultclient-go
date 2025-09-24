@@ -1,19 +1,15 @@
 package vaultclient
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/smithy-go"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -28,8 +24,12 @@ type GetAccountTest struct {
 	description string
 }
 
-func GetAccountErrorMaker(errs []request.ErrInvalidParam) error {
-	return invalidParamsErrorMaker(errs, "GetAccountInput")
+func GetAccountErrorMaker(errs []smithy.InvalidParamError) error {
+	invalidParams := &smithy.InvalidParamsError{Context: "GetAccountInput"}
+	for _, err := range errs {
+		invalidParams.Add(err)
+	}
+	return invalidParams
 }
 
 var listGetAccountTests = []GetAccountTest{
@@ -39,26 +39,17 @@ var listGetAccountTests = []GetAccountTest{
 	{description: "Should pass with valid id", id: &mockID, err: nil},
 	{description: "Should pass with valid name", name: &mockName, err: nil},
 
-	{description: "Should fail if arn is empty", arn: aws.String(""), err: GetAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Arn", 1)})},
-	{description: "Should fail if canonicalId is empty", canonicalId: aws.String(""), err: GetAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("CanonicalId", 1)})},
-	{description: "Should fail if email is empty", email: aws.String(""), err: GetAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Email", 1)})},
-	{description: "Should fail if id is empty", id: aws.String(""), err: GetAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("ID", 1)})},
-	{description: "Should fail if name is empty", name: aws.String(""), err: GetAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("Name", 1)})},
+	{description: "Should fail if arn is empty", arn: aws.String(""), err: GetAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("Arn", 1)})},
+	{description: "Should fail if canonicalId is empty", canonicalId: aws.String(""), err: GetAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("CanonicalId", 1)})},
+	{description: "Should fail if email is empty", email: aws.String(""), err: GetAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("Email", 1)})},
+	{description: "Should fail if id is empty", id: aws.String(""), err: GetAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("ID", 1)})},
+	{description: "Should fail if name is empty", name: aws.String(""), err: GetAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("Name", 1)})},
 
-	{description: "Should fail if no field is set", err: GetAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("Arn, ID, Name, Email or CanonicalId")})},
+	{description: "Should fail if no field is set", err: GetAccountErrorMaker([]smithy.InvalidParamError{smithy.NewErrParamRequired("Arn, ID, Name, Email or CanonicalId")})},
 }
 
 func mockGetAccountResponseBody(req *http.Request, t *testing.T) mockValue {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(req.Body)
-	if err != nil {
-		t.Error(err)
-	}
-
-	v, err := url.ParseQuery(buf.String())
-	if err != nil {
-		t.Error(err)
-	}
+	v := req.Form
 
 	if !v.Has("accountArn") && !v.Has("canonicalId") && !v.Has("emailAddress") &&
 		!v.Has("accountId") && !v.Has("accountName") {
@@ -86,6 +77,15 @@ func mockGetAccountResponseBody(req *http.Request, t *testing.T) mockValue {
 
 func TestGetAccount(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		err := req.ParseForm()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if action := req.Form.Get("Action"); action != opGetAccount {
+			t.Errorf("Expected Action=GetAccount, got Action=%s", action)
+		}
+
 		// Send response to be tested
 		resBody := mockGetAccountResponseBody(req, t)
 		if len(resBody) == 0 {
@@ -108,13 +108,7 @@ func TestGetAccount(t *testing.T) {
 			description := tc.description
 			Convey(description, func() {
 				ctx := context.Background()
-				sess := session.Must(session.NewSession(&aws.Config{
-					Endpoint:    aws.String(server.URL),
-					Region:      aws.String("us-east-1"),
-					HTTPClient:  server.Client(),
-					Credentials: credentials.NewStaticCredentials("foo", "bar", "000"),
-				}))
-				svc := New(sess)
+				svc := New("foo", "bar", "", server.URL, "us-east-1")
 				params := &GetAccountInput{}
 				if tc.arn != nil {
 					params.SetArn(*tc.arn)

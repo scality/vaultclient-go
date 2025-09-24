@@ -7,10 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/smithy-go"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -24,15 +22,19 @@ type deleteAccountTest struct {
 	description string
 }
 
-func deleteAccountErrorMaker(errs []request.ErrInvalidParam) error {
-	return invalidParamsErrorMaker(errs, "DeleteAccountInput")
+func deleteAccountErrorMaker(errs []smithy.InvalidParamError) error {
+	invalidParams := &smithy.InvalidParamsError{Context: "DeleteAccountInput"}
+	for _, err := range errs {
+		invalidParams.Add(err)
+	}
+	return invalidParams
 }
 
 var listDeleteAccountTests = []deleteAccountTest{
-	{description: "Should pass with valid accountName ", accountName: &mockName, err: nil},
+	{description: "Should pass with valid accountName", accountName: &mockName, err: nil},
 
-	{description: "Should fail if accountName is empty", accountName: aws.String(""), err: deleteAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamMinLen("AccountName", 1)})},
-	{description: "Should fail if accountName is not set", err: deleteAccountErrorMaker([]request.ErrInvalidParam{request.NewErrParamRequired("AccountName")})},
+	{description: "Should fail if accountName is empty", accountName: aws.String(""), err: deleteAccountErrorMaker([]smithy.InvalidParamError{NewErrParamMinLen("AccountName", 1)})},
+	{description: "Should fail if accountName is not set", err: deleteAccountErrorMaker([]smithy.InvalidParamError{smithy.NewErrParamRequired("AccountName")})},
 }
 
 func TestDeleteAccount(t *testing.T) {
@@ -56,13 +58,7 @@ func TestDeleteAccount(t *testing.T) {
 			description := tc.description
 			Convey(description, func() {
 				ctx := context.Background()
-				sess := session.Must(session.NewSession(&aws.Config{
-					Endpoint:    aws.String(server.URL),
-					Region:      aws.String("us-east-1"),
-					HTTPClient:  server.Client(),
-					Credentials: credentials.NewStaticCredentials("foo", "bar", "000"),
-				}))
-				svc := New(sess)
+				svc := New("foo", "bar", "", server.URL, "us-east-1")
 				params := &DeleteAccountInput{}
 				if tc.accountName != nil {
 					params.SetAccountName(*tc.accountName)
