@@ -3,6 +3,7 @@ package vaultclient
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"net/url"
 	"strconv"
 	"time"
@@ -102,7 +103,7 @@ type AccountFromList struct {
 	Name        *string    `locationName:"name" json:"name"`
 	Email       *string    `locationName:"emailAddress" json:"emailAddress"`
 	ID          *string    `locationName:"id" json:"id"`
-	QuotaMax    *int64     `locationName:"quota" json:"quota"`
+	QuotaMax    *big.Int   `locationName:"quota" json:"quota"`
 	CreateDate  *time.Time `locationName:"createDate" json:"createDate"`
 	CanonicalID *string    `locationName:"canonicalId" json:"canonicalId"`
 }

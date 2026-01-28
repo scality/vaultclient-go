@@ -3,8 +3,8 @@ package vaultclient
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/aws/smithy-go"
@@ -13,10 +13,10 @@ import (
 const opCreateAccount = "CreateAccount"
 
 type CreateAccountInput struct {
-	Name              *string `locationName:"name"`
-	Email             *string `locationName:"emailAddress"`
-	QuotaMax          *int64  `locationName:"quotaMax"`
-	ExternalAccountID *string `locationName:"externalAccountId"`
+	Name              *string  `locationName:"name"`
+	Email             *string  `locationName:"emailAddress"`
+	QuotaMax          *big.Int `locationName:"quotaMax"`
+	ExternalAccountID *string  `locationName:"externalAccountId"`
 }
 
 // String returns the string representation
@@ -40,7 +40,7 @@ func (s *CreateAccountInput) Validate() error {
 		invalidParams.Add(NewErrParamMinLen("Email", 1))
 	}
 
-	if s.QuotaMax != nil && *s.QuotaMax < 1 {
+	if s.QuotaMax != nil && s.QuotaMax.Cmp(big.NewInt(1)) < 0 {
 		invalidParams.Add(NewErrParamMinValue("QuotaMax", 1))
 	}
 
@@ -67,8 +67,8 @@ func (s *CreateAccountInput) SetEmail(v string) *CreateAccountInput {
 }
 
 // SetQuotaMax sets the QuotaMax field's value.
-func (s *CreateAccountInput) SetQuotaMax(v int64) *CreateAccountInput {
-	s.QuotaMax = &v
+func (s *CreateAccountInput) SetQuotaMax(v *big.Int) *CreateAccountInput {
+	s.QuotaMax = v
 	return s
 }
 
@@ -83,7 +83,7 @@ func (s *CreateAccountInput) getUrlValues() url.Values {
 	formData.Set("name", *s.Name)
 	formData.Set("emailAddress", *s.Email)
 	if s.QuotaMax != nil {
-		formData.Set("quotaMax", strconv.FormatInt(*s.QuotaMax, 10))
+		formData.Set("quotaMax", s.QuotaMax.String())
 	}
 	if s.ExternalAccountID != nil {
 		formData.Set("externalAccountId", *s.ExternalAccountID)
@@ -126,7 +126,7 @@ type AccountData struct {
 	Name        *string    `locationName:"name" json:"name"`
 	Email       *string    `locationName:"emailAddress" json:"emailAddress"`
 	ID          *string    `locationName:"id" json:"id"`
-	QuotaMax    *int64     `locationName:"quotaMax" json:"quotaMax"`
+	QuotaMax    *big.Int   `locationName:"quotaMax" json:"quotaMax"`
 	CreateDate  *time.Time `locationName:"createDate" json:"createDate"`
 	CanonicalID *string    `locationName:"canonicalId" json:"canonicalId"`
 	AliasList   []*string  `locationName:"aliasList" json:"aliasList"`

@@ -18,7 +18,7 @@ var (
 	mockMaxItems    = aws.Int64(10)
 )
 
-func mockListAccountsResponseBody(req *http.Request, t *testing.T) mockValue {
+func mockListAccountsResponseBody() mockValue {
 	return mockValue{
 		"isTruncated": mockIsTruncated,
 		"marker":      mockMarker,
@@ -30,7 +30,7 @@ func mockListAccountsResponseBody(req *http.Request, t *testing.T) mockValue {
 				"createDate":   mockCreateDate,
 				"emailAddress": mockEmail,
 				"canonicalId":  mockCanonicalID,
-				"quota":        mockQuotaMax,
+				"quota":        mockBigIntOverflow,
 			},
 		},
 	}
@@ -72,7 +72,7 @@ func TestListAccounts(t *testing.T) {
 		}
 
 		// Send response to be tested
-		resBody := mockListAccountsResponseBody(req, t)
+		resBody := mockListAccountsResponseBody()
 		rjson, err := json.Marshal(resBody)
 		if err != nil {
 			t.Error(err)
@@ -113,6 +113,7 @@ func TestListAccounts(t *testing.T) {
 					So(*account.Name, ShouldEqual, mockName)
 					So(*account.ID, ShouldEqual, mockID)
 					So(*account.Arn, ShouldEqual, mockArn)
+					So(account.QuotaMax.Cmp(mockBigIntOverflow), ShouldEqual, 0)
 					So(*account.CanonicalID, ShouldEqual, mockCanonicalID)
 					So(*account.CreateDate, ShouldEqual, mockTime)
 				}

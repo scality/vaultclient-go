@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -28,7 +29,7 @@ func main() {
 	createInput := &vaultclient.CreateAccountInput{}
 	createInput.SetName(accountName).
 		SetEmail(fmt.Sprintf("%d@example.com", time.Now().Unix())).
-		SetQuotaMax(100)
+		SetQuotaMax(big.NewInt(100))
 
 	createResult, err := client.CreateAccount(ctx, createInput)
 	if err == nil {
