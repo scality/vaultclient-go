@@ -2,6 +2,7 @@ package vaultclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -130,6 +131,33 @@ type AccountData struct {
 	CreateDate  *time.Time `locationName:"createDate" json:"createDate"`
 	CanonicalID *string    `locationName:"canonicalId" json:"canonicalId"`
 	AliasList   []*string  `locationName:"aliasList" json:"aliasList"`
+}
+
+// UnmarshalJSON implements custom unmarshaling for AccountData to handle
+// quotaMax being either a JSON number or a JSON string.
+func (a *AccountData) UnmarshalJSON(data []byte) error {
+	// Use an alias to avoid infinite recursion
+	type Alias AccountData
+	aux := &struct {
+		QuotaMax *json.Number `json:"quotaMax"`
+		*Alias
+	}{
+		Alias: (*Alias)(a),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if aux.QuotaMax != nil {
+		quotaMax, err := aux.QuotaMax.Int64()
+		if err != nil {
+			return err
+		}
+		a.QuotaMax = &quotaMax
+	}
+
+	return nil
 }
 
 // CreateAccountOutput contains the response to a successful CreateAccount request.

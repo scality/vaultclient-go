@@ -152,3 +152,48 @@ func TestCreateAccount(t *testing.T) {
 		}
 	})
 }
+
+func TestAccountDataUnmarshalJSON(t *testing.T) {
+	Convey("Test AccountData UnmarshalJSON", t, func() {
+		Convey("Should unmarshal quotaMax from JSON number", func() {
+			jsonData := `{"quotaMax": 100}`
+			var data AccountData
+			err := json.Unmarshal([]byte(jsonData), &data)
+			So(err, ShouldBeNil)
+			So(data.QuotaMax, ShouldNotBeNil)
+			So(*data.QuotaMax, ShouldEqual, 100)
+		})
+
+		Convey("Should unmarshal quotaMax from JSON string", func() {
+			jsonData := `{"quotaMax": "200"}`
+			var data AccountData
+			err := json.Unmarshal([]byte(jsonData), &data)
+			So(err, ShouldBeNil)
+			So(data.QuotaMax, ShouldNotBeNil)
+			So(*data.QuotaMax, ShouldEqual, 200)
+		})
+
+		Convey("Should unmarshal quotaMax as nil when null", func() {
+			jsonData := `{"quotaMax": null}`
+			var data AccountData
+			err := json.Unmarshal([]byte(jsonData), &data)
+			So(err, ShouldBeNil)
+			So(data.QuotaMax, ShouldBeNil)
+		})
+
+		Convey("Should unmarshal quotaMax as nil when field is missing", func() {
+			jsonData := `{"name": "test"}`
+			var data AccountData
+			err := json.Unmarshal([]byte(jsonData), &data)
+			So(err, ShouldBeNil)
+			So(data.QuotaMax, ShouldBeNil)
+		})
+
+		Convey("Should fail when quotaMax is an invalid string", func() {
+			jsonData := `{"quotaMax": "not-a-number"}`
+			var data AccountData
+			err := json.Unmarshal([]byte(jsonData), &data)
+			So(err, ShouldNotBeNil)
+		})
+	})
+}
