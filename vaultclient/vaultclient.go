@@ -32,17 +32,35 @@ const (
 	ServiceName = "iam" // Name of service.
 )
 
-func New(accessKey, secretKey, sessionToken, endpoint, region string) *Vault {
-	return &Vault{
+type Option func(*Vault)
+
+func NewHTTPClient() *http.Client {
+	return &http.Client{Timeout: 60 * time.Second}
+}
+
+func WithHTTPClient(c *http.Client) Option {
+	return func(v *Vault) {
+		if c != nil {
+			v.httpClient = c
+		}
+	}
+}
+
+func New(accessKey, secretKey, sessionToken, endpoint, region string, opts ...Option) *Vault {
+	v := &Vault{
 		endpoint:   endpoint,
 		region:     region,
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: NewHTTPClient(),
 		creds: credentials.NewStaticCredentialsProvider(
 			accessKey,
 			secretKey,
 			sessionToken,
 		),
 	}
+	for _, opt := range opts {
+		opt(v)
+	}
+	return v
 }
 
 // makeAWSRequest is a helper function that handles AWS v4 signing and HTTP requests with retry logic
