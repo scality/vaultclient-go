@@ -21,10 +21,11 @@ import (
 
 // Vault provides the API operation methods for making requests to Vault.
 type Vault struct {
-	endpoint   string
-	region     string
-	httpClient *http.Client
-	creds      aws.CredentialsProvider
+	endpoint     string
+	region       string
+	httpClient   *http.Client
+	creds        aws.CredentialsProvider
+	preSignHooks []PreSignHook
 }
 
 // Service information constants
@@ -42,6 +43,21 @@ func WithHTTPClient(c *http.Client) Option {
 	return func(v *Vault) {
 		if c != nil {
 			v.httpClient = c
+		}
+	}
+}
+
+// PreSignHook can modify an outgoing request right before it is SigV4-signed,
+// so headers it sets are covered by the signature. It runs on every attempt;
+// returning an error aborts the request.
+type PreSignHook func(ctx context.Context, req *http.Request) error
+
+// WithPreSignHook registers a PreSignHook. It can be given several times,
+// hooks run in the order they were registered.
+func WithPreSignHook(hook PreSignHook) Option {
+	return func(v *Vault) {
+		if hook != nil {
+			v.preSignHooks = append(v.preSignHooks, hook)
 		}
 	}
 }
@@ -83,6 +99,12 @@ func (c *Vault) makeAWSRequest(ctx context.Context, action string, formData url.
 
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Host", req.URL.Host)
+
+		for _, hook := range c.preSignHooks {
+			if err := hook(ctx, req); err != nil {
+				return nil, fmt.Errorf("pre-sign hook failed: %w", err)
+			}
+		}
 
 		// Hash the request body payload for AWS signing
 		hash := sha256.Sum256([]byte(requestBody))
